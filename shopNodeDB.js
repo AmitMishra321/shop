@@ -21,6 +21,20 @@ let fs = require("fs")
 let fname = "shop.json"
 let data = JSON.stringify(Data)
 
+const { Client } = require("pg")
+const client = new Client({
+   user: "postgres",
+   password: "@shop_DB#7897",
+   database: "postgres",
+   port: "5432",
+   host: "db.hrhgjuwnrcauhlxqcbmz.supabase.co",
+   ssl: { rejectUnauthorized: false }
+})
+client.connect(function (res, err) {
+   console.log('Connected!!!')
+})
+
+
 
 app.get("/svr/resetData", function (req, res) {
   fs.writeFile(fname, data, function (err) {
@@ -49,7 +63,8 @@ app.post("/shops", function (req, res) {
       let Array = JSON.parse(data)
       let maxId = Array.shops.reduce((acc, curr) => curr.shopId > acc ? curr.shopId : acc, 0)
       let newId = maxId + 1
-      let newbody = { ...body, shopid: newId }
+      let newbody = { ...body, shopId: newId }
+      console.log(newbody)
       Array.shops.push(newbody)
       let data1 = JSON.stringify(Array)
       fs.writeFile(fname, data1, function (err) {
@@ -79,7 +94,7 @@ app.post("/products", function (req, res) {
       let Array = JSON.parse(data)
       let maxId = Array.products.reduce((acc, curr) => curr.productId > acc ? curr.productId : acc, 0)
       let newId = maxId + 1;
-      let newbody = { ...body, newId };
+      let newbody = { ...body, productId:newId };
       Array.products.push(newbody)
       let data1 = JSON.stringify(Array)
       fs.writeFile(fname, data1, function (err) {
@@ -114,10 +129,10 @@ app.get("/purchases", function (req, res) {
     else {
       let Array = JSON.parse(data)
       let result = Array.purchases
-      result = shop ? result.filter((ele) => ele.shopId == shop)
-        : result
-      result = product ? result.filter((ele) => ele.productid == product)
-        : result
+      result = shop ? filterParams(result,'shopId',shop):result
+      console.log(result)
+      result=product?filterParams(result,'productid',product):result
+
       result=sort==='QtyAsc'?result.sort((p1,p2)=>(+p1. quantity)-(+p2. quantity)):result
       result=sort==='QtyDesc'?result.sort((p1,p2)=>(+p2. quantity)-(+p1.quantity)):result
       result=sort==='ValueAsc'?result.sort((p1,p2)=>(+p1.price*+p1. quantity)-(+p2.price*+p2. quantity)):result
@@ -126,6 +141,15 @@ app.get("/purchases", function (req, res) {
     }
   })
 })
+
+filterParams=(arr,name,value)=>{
+  if(!value) return arr;
+  let ValueArr=value.split(",")
+  let arr1=arr.filter((a1)=>ValueArr.find((val)=>val==a1[name]));
+  console.log(arr1)
+  return arr1;
+  }
+  
 
 
 app.get("/purchases/shops/:id", function (req, res) {
@@ -152,19 +176,6 @@ app.get("/purchases/products/:id", function (req, res) {
   })
 })
 
-
-app.get("/totalPurchase/shop/:id –", function (req, res) {
-  id = req.params.id;
-  fs.readFile(fname, "utf-8", function (err, data) {
-    if (err) res.status(404).send(err)
-    else {
-      let Array = JSON.parse(data)
-      let shop = Array.purchases.filter((ele) => ele.shopId == id)
-      let arr=shop.reduce((acc,curr)=>acc.find((ele)=>ele.productid==curr.ele.productid)?acc:{productid:curr.productid,})
-      res.send(shop);
-    }
-  })
-})
 
 
 app.post("/purchases", function (req, res) {
@@ -211,3 +222,25 @@ app.put("/products/:id",function(req,res){
     }
   })
 })
+
+
+
+app.get("/totalPurchases/shops/:id",function(req,res){
+  let id=req.params.id;
+  let sql=`SELECT productid, SUM(quantity) FROM purchases WHERE shopid=$1 GROUP BY productid`
+  client.query(sql,[id],function(err,result){
+     if(err) res.status(400).send(err.message)
+     else res.send(result)
+  })
+})
+
+
+app.get("/totalPurchases/product/:id",function(req,res){
+  let id=req.params.id;
+  let sql=`SELECT shopid, SUM(quantity)  FROM purchases WHERE productid=$1 GROUP BY shopid`
+  client.query(sql,[id],function(err,result){
+     if(err) res.status(400).send(err.message)
+     else res.send(result)
+  })
+})
+
